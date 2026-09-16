@@ -14,8 +14,7 @@ void shutdown() {
 }
 
 void update([[maybe_unused]] double time) {
-	ImGui::Begin("Hello world!");
-	ImGui::End();
+	ImGui::ShowDemoWindow();
 }
 
 void render(const graphics::internal::FrameData& fd) {
