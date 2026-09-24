@@ -105,7 +105,7 @@ bool initializeImGUI() {
 	const VkAttachmentDescription render_pass_attachment = {
 		.format = context.swapchain_format,
 		.samples = VK_SAMPLE_COUNT_1_BIT,
-		.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD,
+		.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
 		.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
 		.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
 		.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
@@ -227,11 +227,17 @@ void drawImGUI() {
 
 	vkBeginCommandBuffer(vk_imgui_command_buffer, &command_buffer_begin);
 
+	const VkClearValue clear_value = {
+		.color = { .float32 = { 0.0f, 0.0f, 0.0f, 1.0f } },
+	};
+
 	const VkRenderPassBeginInfo render_pass_begin = {
 		.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
 		.renderPass = vk_imgui_render_pass,
 		.framebuffer = vk_imgui_framebuffers[vk_swapchain_current_image],
 		.renderArea = { .extent = context.swapchain_extent },
+		.clearValueCount = 1,
+		.pClearValues = &clear_value,
 	};
 
 	vkCmdBeginRenderPass(vk_imgui_command_buffer, &render_pass_begin, VK_SUBPASS_CONTENTS_INLINE);
@@ -786,7 +792,7 @@ void submitAndPresent() {
 	    result == VK_SUBOPTIMAL_KHR ||
 	    vk_swapchain_resize_require) {
 		rebuildSwapchain(vk_swapchain_resize_width, vk_swapchain_resize_height);
-	} else {
+	} else if (result != VK_SUCCESS) {
 		std::cerr << "Failed to present Vulkan swapchain image\n";
 	}
 }
