@@ -3,6 +3,8 @@ include(FetchContent)
 
 project(vulkan-starter-app LANGUAGES C CXX)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 add_executable(${PROJECT_NAME} source/main.cpp source/graphics_internal.cpp source/application.cpp)
 
 if(LINUX)
