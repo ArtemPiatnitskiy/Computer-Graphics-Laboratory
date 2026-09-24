@@ -38,6 +38,7 @@ uint32_t vk_swapchain_resize_width;
 uint32_t vk_swapchain_resize_height;
 bool vk_swapchain_resize_require;
 
+VkFormat vk_depth_buffer_format = VK_FORMAT_UNDEFINED;
 VkImage vk_image_depth_buffer;
 VmaAllocation vma_allocation_depth_buffer;
 VkImageView vk_image_view_depth_buffer;
@@ -57,7 +58,25 @@ std::vector<VkFramebuffer> vk_imgui_framebuffers;
 VkCommandPool vk_imgui_command_pool;
 VkCommandBuffer vk_imgui_command_buffer;
 
-bool initializeImGUI(GLFWwindow* const window) {
+VkFormat selectDepthFormat(VkPhysicalDevice physical_device) {
+	// Prefer the original format and preserve stencil support in the fallback.
+	const VkFormat candidates[] = {
+		VK_FORMAT_D24_UNORM_S8_UINT,
+		VK_FORMAT_D32_SFLOAT_S8_UINT,
+	};
+
+	for (VkFormat format : candidates) {
+		VkFormatProperties properties{};
+		vkGetPhysicalDeviceFormatProperties(physical_device, format, &properties);
+		if (properties.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) {
+			return format;
+		}
+	}
+
+	return VK_FORMAT_UNDEFINED;
+}
+
+bool initializeImGUI() {
 	const VkDescriptorPoolSize descriptor_pool_sizes[] = {
 		{
 			.type = VK_DESCRIPTOR_TYPE_SAMPLER,
@@ -132,9 +151,6 @@ bool initializeImGUI(GLFWwindow* const window) {
 		return false;
 	}
 
-	int width = 0, height = 0;
-	glfwGetWindowSize(window, &width, &height);
-
 	const uint32_t swapchain_images_count = uint32_t(vk_swapchain_images.size());
 
 	vk_imgui_framebuffers.resize(swapchain_images_count);
@@ -143,8 +159,8 @@ bool initializeImGUI(GLFWwindow* const window) {
 		.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
 		.renderPass = vk_imgui_render_pass,
 		.attachmentCount = 1,
-		.width = uint32_t(width),
-		.height = uint32_t(height),
+		.width = context.swapchain_extent.width,
+		.height = context.swapchain_extent.height,
 		.layers = 1,
 	};
 
@@ -269,8 +285,8 @@ bool rebuildSwapchain(uint32_t width, uint32_t height) {
 	const VkImageCreateInfo depth_buffer = {
 		.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
 		.imageType = VK_IMAGE_TYPE_2D,
-		.format = VK_FORMAT_D24_UNORM_S8_UINT,
-		.extent = { uint32_t(width), uint32_t(height), 1 },
+		.format = vk_depth_buffer_format,
+		.extent = { context.swapchain_extent.width, context.swapchain_extent.height, 1 },
 		.mipLevels = 1,
 		.arrayLayers = 1,
 		.samples = VK_SAMPLE_COUNT_1_BIT,
@@ -295,7 +311,7 @@ bool rebuildSwapchain(uint32_t width, uint32_t height) {
 		.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
 		.image = vk_image_depth_buffer,
 		.viewType = VK_IMAGE_VIEW_TYPE_2D,
-		.format = VK_FORMAT_D24_UNORM_S8_UINT,
+		.format = vk_depth_buffer_format,
 		.subresourceRange = {
 			.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
 			.baseMipLevel = 0,
@@ -323,8 +339,8 @@ bool rebuildSwapchain(uint32_t width, uint32_t height) {
 		.renderPass = context.render_pass,
 		.attachmentCount = sizeof(framebuffer_attachments) / sizeof(framebuffer_attachments[0]),
 		.pAttachments = framebuffer_attachments,
-		.width = uint32_t(width),
-		.height = uint32_t(height),
+		.width = context.swapchain_extent.width,
+		.height = context.swapchain_extent.height,
 		.layers = 1,
 	};
 
@@ -346,8 +362,8 @@ bool rebuildSwapchain(uint32_t width, uint32_t height) {
 		.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
 		.renderPass = vk_imgui_render_pass,
 		.attachmentCount = 1,
-		.width = uint32_t(width),
-		.height = uint32_t(height),
+		.width = context.swapchain_extent.width,
+		.height = context.swapchain_extent.height,
 		.layers = 1,
 	};
 
@@ -371,9 +387,6 @@ bool rebuildSwapchain(uint32_t width, uint32_t height) {
 Context context;
 
 bool initialize(GLFWwindow* const window) {
-	int width = 0, height = 0;
-	glfwGetWindowSize(window, &width, &height);
-
 	vkb::InstanceBuilder ib;
 
 	auto ibr = ib.require_api_version(VK_MAKE_VERSION(1, 1, 0))
@@ -402,6 +415,12 @@ bool initialize(GLFWwindow* const window) {
 	}
 
 	auto vkb_physical_device = pds_result.value();
+
+	vk_depth_buffer_format = selectDepthFormat(vkb_physical_device.physical_device);
+	if (vk_depth_buffer_format == VK_FORMAT_UNDEFINED) {
+		std::cerr << "No supported depth/stencil attachment format found\n";
+		return false;
+	}
 
 	vkb::DeviceBuilder db(vkb_physical_device);
 
@@ -467,8 +486,8 @@ bool initialize(GLFWwindow* const window) {
 	const VkImageCreateInfo depth_buffer = {
 		.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
 		.imageType = VK_IMAGE_TYPE_2D,
-		.format = VK_FORMAT_D24_UNORM_S8_UINT,
-		.extent = { uint32_t(width), uint32_t(height), 1 },
+		.format = vk_depth_buffer_format,
+		.extent = { context.swapchain_extent.width, context.swapchain_extent.height, 1 },
 		.mipLevels = 1,
 		.arrayLayers = 1,
 		.samples = VK_SAMPLE_COUNT_1_BIT,
@@ -493,7 +512,7 @@ bool initialize(GLFWwindow* const window) {
 		.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
 		.image = vk_image_depth_buffer,
 		.viewType = VK_IMAGE_VIEW_TYPE_2D,
-		.format = VK_FORMAT_D24_UNORM_S8_UINT,
+		.format = vk_depth_buffer_format,
 		.subresourceRange = {
 			.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
 			.baseMipLevel = 0,
@@ -521,7 +540,7 @@ bool initialize(GLFWwindow* const window) {
 			.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 		},
 		{
-			.format = VK_FORMAT_D24_UNORM_S8_UINT,
+			.format = vk_depth_buffer_format,
 			.samples = VK_SAMPLE_COUNT_1_BIT,
 			.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
 			.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
@@ -572,8 +591,8 @@ bool initialize(GLFWwindow* const window) {
 		.renderPass = context.render_pass,
 		.attachmentCount = sizeof(framebuffer_attachments) / sizeof(framebuffer_attachments[0]),
 		.pAttachments = framebuffer_attachments,
-		.width = uint32_t(width),
-		.height = uint32_t(height),
+		.width = context.swapchain_extent.width,
+		.height = context.swapchain_extent.height,
 		.layers = 1,
 	};
 
@@ -640,7 +659,7 @@ bool initialize(GLFWwindow* const window) {
 		return false;
 	}
 
-	if (!initializeImGUI(window)) {
+	if (!initializeImGUI()) {
 		std::cerr << "Failed to initialize ImGUI Vulkan rendering backend\n";
 		return false;
 	}
