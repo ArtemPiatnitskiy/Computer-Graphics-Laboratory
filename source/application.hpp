@@ -1,6 +1,8 @@
 #pragma once
 
 #include "graphics_internal.hpp"
+#include <string>
+#include <vector>
 
 namespace application {
 
