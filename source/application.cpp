@@ -611,7 +611,7 @@ namespace application {
 			case 1 :
 				result = glm::perspectiveRH_ZO(
 					glm::radians(50.0f), // полный вертикальный угол обзора перспективной камеры
-					aspect, // ширина изображения, делённая на высоту
+					aspect, // ширина изображения, делённая на высоту (соотношение сторон)
 					// расстояния до ближней и дальней плоскостей отсечения, измеренные вдоль направления взгляда.
 					0.1f,
 					100.0f
@@ -693,7 +693,7 @@ namespace application {
 }
 
 bool initialize() {
-	Mesh tour = makeTorus(0.8f, 0.35f, 128, 64);
+	Mesh tour = makeTorus(0.8f, 0.35f, 8, 4);
 
 	index_count = static_cast<uint32_t>(tour.indices.size());
 
